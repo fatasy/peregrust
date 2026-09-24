@@ -32,6 +32,15 @@ window.addEventListener('pointerdown', () => pointerEvents++);
 Peregrust.control.registerState('player', () => ({
   position: player.position.toArray(), held: [...held], pointerEvents,
 }));
+Peregrust.control.registerAction('player.teleport', {
+  description: 'Move the demo player to an exact world position.',
+  inputSchema: { type: 'object', properties: { x: { type: 'number' }, y: { type: 'number' } },
+    required: ['x', 'y'], additionalProperties: false },
+}, ({ x, y }) => {
+  player.position.set(x, y, 0);
+  console.info('Player teleported');
+  return { position: player.position.toArray() };
+});
 window.addEventListener('resize', () => renderer.setSize(window.innerWidth, window.innerHeight, false));
 await renderer.setAnimationLoop(() => {
   if (held.has('KeyW')) player.position.y += 0.02;

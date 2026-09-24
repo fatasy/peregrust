@@ -115,6 +115,64 @@ test('registration works without exposing an external control loop', () => {
   assert.equal(h.context.__peregrustControlBeforeFrame, undefined);
 });
 
+test('pause freezes callbacks and queries, step supplies exact timestamps, resume excludes paused time', async () => {
+  const h = harness();
+  const timestamps = [];
+  h.context.Peregrust.onFrame((time) => timestamps.push(time));
+  await h.context.__peregrustDispatchFrame(100);
+  h.requests.push({ method: 'runtime.pause' });
+  await h.context.__peregrustDispatchFrame(200);
+  h.requests.push({ method: 'runtime.info' });
+  await h.context.__peregrustDispatchFrame(9000);
+  assert.deepEqual(timestamps, [100]);
+  assert.equal(h.replies.at(-1).frame, 1);
+  h.requests.push({ method: 'runtime.step', params: { frames: 3, dtMs: 20 } });
+  await h.context.__peregrustDispatchFrame(9010);
+  await h.context.__peregrustDispatchFrame(9090);
+  await h.context.__peregrustDispatchFrame(9200);
+  assert.deepEqual(timestamps, [100, 120, 140, 160]);
+  assert.equal(h.replies.at(-1).frame, 4);
+  assert.equal(h.context.__peregrustControlShouldSchedule(), false);
+  h.requests.push({ method: 'runtime.resume' });
+  await h.context.__peregrustDispatchFrame(20000);
+  await h.context.__peregrustDispatchFrame(20025);
+  assert.deepEqual(timestamps, [100, 120, 140, 160, 160, 185]);
+});
+
+test('registered actions validate input before mutation and can observe while paused', async () => {
+  const h = harness();
+  let health = 100;
+  h.context.Peregrust.control.registerState('player', () => ({ health }));
+  const remove = h.context.Peregrust.control.registerAction('heal', {
+    description: 'Heal a player', inputSchema: { type: 'object', properties: { amount: { type: 'integer', minimum: 1, maximum: 10 } }, required: ['amount'], additionalProperties: false },
+  }, ({ amount }) => { health += amount; return { health }; });
+  assert.throws(() => h.context.Peregrust.control.registerAction('bad', { description: 'bad', inputSchema: { type: 'object', $ref: 'other' } }, () => null), /unsupported/);
+  h.requests.push({ method: 'runtime.pause' }); await h.frame();
+  h.requests.push({ method: 'action.call', params: { name: 'heal', input: { amount: 50 } } }); await h.frame();
+  assert.equal(h.replies.at(-1).error.code, 'INVALID_ARGUMENT');
+  assert.equal(health, 100);
+  h.requests.push({ method: 'action.call', params: { name: 'heal', input: { amount: 5 }, observe: { state: 'player' } } }); await h.frame();
+  assert.equal(h.replies.at(-1).result.state.health, 105);
+  assert.equal(h.replies.at(-1).frame, 0);
+  remove();
+  h.requests.push({ method: 'action.list' }); await h.frame();
+  assert.equal(h.replies.at(-1).result.total, 0);
+});
+
+test('log ring truncates output, reports overwritten entries and supports cursors', async () => {
+  const h = harness();
+  for (let i = 0; i < 1030; i++) h.context.__peregrustRecordLog(`message ${i}`, i % 4);
+  h.requests.push({ method: 'runtime.logs', params: { limit: 2 } }); await h.frame();
+  const first = h.replies.at(-1).result;
+  assert.equal(first.oldestSequence, 7);
+  assert.equal(first.entries.length, 2);
+  h.requests.push({ method: 'runtime.logs', params: { after: first.nextCursor, limit: 1, level: 'error' } }); await h.frame();
+  assert.equal(h.replies.at(-1).result.entries[0].level, 'error');
+  assert.ok(h.replies.at(-1).result.nextCursor > first.nextCursor);
+  h.requests.push({ method: 'runtime.metrics' }); await h.frame();
+  assert.equal(h.replies.at(-1).result.samples, 3);
+});
+
 test('scene queries paginate, distinguish duplicate names, and validate patches atomically', () => {
   let adapter;
   const scene = new THREE.Scene();
@@ -139,7 +197,7 @@ test('scene queries paginate, distinguish duplicate names, and validate patches 
 });
 
 test('captures restore the renderer target after GPU readback failure', async () => {
-  let adapter, disposed = false;
+  let adapter, disposed = false, customRenders = 0;
   const original = {}, current = { target: original };
   const renderer = {
     getDrawingBufferSize: (out) => out.set(320, 240),
@@ -155,9 +213,25 @@ test('captures restore the renderer target after GPU readback failure', async ()
     readRenderTargetPixelsAsync: async () => { throw new Error('readback failed'); },
   };
   attachThree({ scene: new THREE.Scene(), camera: new THREE.PerspectiveCamera(), renderer,
+    render: () => { customRenders++; assert.notEqual(current.target, original); },
     runtime: { control: { registerScene: (_, value) => { adapter = value; return () => {}; } } },
   });
   await assert.rejects(adapter.capture(), /readback failed/);
   assert.equal(current.target, original);
   assert.equal(disposed, true);
+  assert.equal(customRenders, 1);
+});
+
+test('capture removes WebGPU row padding for arbitrary image widths', async () => {
+  let adapter;
+  const bytes = new Uint8Array(256 * 2 + 8);
+  bytes.fill(10, 0, 8); bytes.fill(20, 256, 264); bytes.fill(30, 512, 520);
+  const renderer = { getDrawingBufferSize: out => out.set(2, 3), getRenderTarget: () => null,
+    getActiveCubeFace: () => 0, getActiveMipmapLevel: () => 0, setRenderTarget() {}, render() {},
+    readRenderTargetPixelsAsync: async () => bytes };
+  attachThree({ scene: new THREE.Scene(), camera: new THREE.PerspectiveCamera(), renderer,
+    runtime: { control: { registerScene: (_, value) => { adapter = value; return () => {}; } } },
+  });
+  const result = await adapter.capture();
+  assert.deepEqual([...result.pixels], [...Array(8).fill(10), ...Array(8).fill(20), ...Array(8).fill(30)]);
 });

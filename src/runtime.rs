@@ -32,6 +32,7 @@ const WEB_BOOTSTRAP: &str = r#"
   const base64 = core.loadExtScript('ext:deno_web/05_base64.js');
   const { Console } = core.loadExtScript('ext:deno_web/01_console.js');
   globalThis.console = new Console((message, level) => {
+    globalThis.__peregrustRecordLog?.(message, level);
     core.print(message, level >= 3);
   });
   globalThis.performance = performance;

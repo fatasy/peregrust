@@ -1,3 +1,6 @@
+import type { PeregrustControl } from './control.js';
+export type { ControlJson, PeregrustControl, PeregrustSceneAdapter } from './control.js';
+
 export interface PeregrustWindow extends EventTarget {
   readonly innerWidth: number;
   readonly innerHeight: number;
@@ -101,22 +104,6 @@ export interface PeregrustGamepad {
 
 export interface PeregrustGamepads {
   poll(): Array<PeregrustGamepad | null>;
-}
-
-export type ControlJson = null | boolean | number | string | ControlJson[] | { [key: string]: ControlJson };
-
-export interface PeregrustSceneAdapter {
-  query(params: Record<string, unknown>): unknown;
-  update(params: Record<string, unknown>): void;
-  capture?(params: Record<string, unknown>): Promise<{ width: number; height: number; pixels: Uint8Array }>;
-}
-
-export interface PeregrustControl {
-  /** True only when started with --control SESSION. Registration itself is always available. */
-  readonly enabled: boolean;
-  registerScene(name: string, adapter: PeregrustSceneAdapter): () => void;
-  /** Providers return synchronous JSON at a frame boundary. */
-  registerState(name: string, provider: () => ControlJson): () => void;
 }
 
 export interface PeregrustRuntime {

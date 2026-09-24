@@ -181,6 +181,7 @@
     window.document = document;
 
     function requestRedraw() {
+      if (root.__peregrustControlShouldSchedule && !root.__peregrustControlShouldSchedule()) return;
       if (redrawRequested) return;
       redrawRequested = true;
       native.requestRedraw();
@@ -391,25 +392,30 @@
       if (root.__peregrustFramePending) throw new Error('overlapping Peregrust frames');
       root.__peregrustFramePending = true;
       redrawRequested = false;
-      Peregrust._frameCount++;
       try {
-        if (root.__peregrustControlBeforeFrame) await root.__peregrustControlBeforeFrame();
-        const callbacks = [...raf];
-        for (const [id] of callbacks) raf.delete(id);
-        for (const [id, callback] of callbacks) {
-          if (callback && !cancelledDuringFrame.has(id)) await callback(timestampMs);
+        const advance = !root.__peregrustControlBeforeFrame || await root.__peregrustControlBeforeFrame();
+        const frameTime = root.__peregrustControlClock?.(timestampMs, advance) ?? timestampMs;
+        if (advance) {
+          Peregrust._frameCount++;
+          root.__peregrustControlFrameStarted?.();
+          const callbacks = [...raf];
+          for (const [id] of callbacks) raf.delete(id);
+          for (const [id, callback] of callbacks) {
+            if (callback && !cancelledDuringFrame.has(id)) await callback(frameTime);
+          }
+          for (const callback of [...frameListeners]) {
+            if (frameListeners.has(callback)) await callback(frameTime);
+          }
         }
-        for (const callback of [...frameListeners]) {
-          if (frameListeners.has(callback)) await callback(timestampMs);
-        }
-        if (root.__peregrustControlAfterFrame) await root.__peregrustControlAfterFrame();
+        if (root.__peregrustControlAfterFrame) await root.__peregrustControlAfterFrame(advance);
       } catch (error) {
         root.__peregrustLastFrameError = error;
         throw error;
       } finally {
         cancelledDuringFrame.clear();
         root.__peregrustFramePending = false;
-        if (raf.size || frameListeners.size) requestRedraw();
+        if ((!root.__peregrustControlShouldSchedule || root.__peregrustControlShouldSchedule())
+          && (raf.size || frameListeners.size)) requestRedraw();
       }
     };
 
