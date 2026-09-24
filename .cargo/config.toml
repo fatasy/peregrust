@@ -1,0 +1,7 @@
+# The Windows V8 prebuilt archive uses the static MSVC runtime. All native
+# code must agree; mixing /MT and /MD produces conflicting CRT definitions.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.aarch64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

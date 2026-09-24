@@ -1,0 +1,41 @@
+{
+  "name": "peregrust",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "default": "./js/index.js"
+    },
+    "./three": {
+      "types": "./types/three.d.ts",
+      "default": "./js/three.js"
+    },
+    "./inspect/three": {
+      "types": "./types/inspect_three.d.ts",
+      "default": "./js/inspect_three.js"
+    }
+  },
+  "types": "./types/index.d.ts",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:demo": "node scripts/build.mjs examples/three-demo.js dist/three-demo.js",
+    "build:stress": "node scripts/build.mjs examples/stress.js dist/stress.js",
+    "build:control": "node scripts/build.mjs examples/control-demo.js dist/control-demo.js",
+    "build:smoke": "node scripts/build.mjs examples/smoke.ts dist/smoke.js",
+    "build:gpu-proof": "node scripts/build.mjs examples/gpu-proof.js dist/gpu-proof.js",
+    "test": "node --test tests/js/*.test.js",
+    "typecheck": "tsc --project tsconfig.json",
+    "test:integration": "node scripts/integration-test.mjs",
+    "test:control": "node scripts/control-integration-test.mjs"
+  },
+  "dependencies": {
+    "@types/three": "0.186.0",
+    "three": "0.186.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2"
+  }
+}
