@@ -4,7 +4,7 @@ const fields = ['id', 'name', 'type', 'parent', 'position', 'rotation', 'scale',
 const invalid = (message) => Object.assign(new Error(message), { code: 'INVALID_ARGUMENT' });
 
 /** Explicit, optional bridge: the native runtime never imports Three.js. */
-export function attachThree({ scene, camera, renderer, name = 'main', runtime = globalThis.Peregrust }) {
+export function attachThree({ scene, camera, renderer, render, name = 'main', runtime = globalThis.Peregrust }) {
   if (!scene?.isObject3D || !camera?.isCamera || !renderer) throw new TypeError('attachThree requires scene, camera and renderer');
   if (!runtime?.control) throw new Error('Peregrust control API is unavailable');
   const world = new Vector3();
@@ -78,7 +78,8 @@ export function attachThree({ scene, camera, renderer, name = 'main', runtime = 
     const previousLevel = renderer.getActiveMipmapLevel();
     try {
       renderer.setRenderTarget(target);
-      renderer.render(scene, camera);
+      if (render) await render();
+      else renderer.render(scene, camera);
       const readback = await renderer.readRenderTargetPixelsAsync(target, 0, 0, width, height);
       const rowBytes = width * 4;
       let pixels = readback;
