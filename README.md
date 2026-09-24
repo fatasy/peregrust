@@ -81,7 +81,10 @@ O adaptador opcional `attachThree`, de `peregrust/inspect/three`, conecta a cena
 câmera e renderer à API. `input.key` mantém uma tecla por uma quantidade definida
 de quadros e pode retornar estado e imagem juntos. Veja [o guia de controle por
 IA](docs/agent-control.md) e [o exemplo executável](examples/control-demo.js).
-MCP pode usar essa mesma API em uma próxima etapa; esta entrega oferece a CLI.
+`peregrust mcp --session <arquivo>` expõe as mesmas operações por MCP stdio,
+com imagens nativas nas respostas. Scripts Node.js/TypeScript podem usar
+`connect` de `peregrust/client`. A API inclui pausa/avanço de animação, logs,
+métricas de callbacks e ações semânticas registradas pelo jogo.
 
 ## Verificação
 
