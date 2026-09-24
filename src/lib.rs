@@ -4,6 +4,7 @@ mod gamepad;
 mod gpu;
 mod host;
 mod loader;
+mod mcp;
 mod runtime;
 mod runtime_worker;
 pub mod storage;
@@ -53,7 +54,7 @@ impl Default for ApplicationOptions {
     name = "peregrust",
     version,
     about = "Native TypeScript game runtime",
-    after_help = "Agent control: peregrust ctl --session SESSION control.describe\nUse peregrust ctl --help for control client options."
+    after_help = "Agent control: peregrust ctl --session SESSION control.describe\nMCP stdio: peregrust mcp --session SESSION\nUse peregrust ctl --help or peregrust mcp --help for options."
 )]
 struct Cli {
     /// Entry JavaScript or TypeScript module, relative to --root.
@@ -842,6 +843,9 @@ pub fn run_with_extensions(extension_factory: fn() -> Vec<deno_core::Extension>)
 
 /// Run a statically linked game host with stable save storage defaults.
 pub fn run_with_options(options: ApplicationOptions) -> Result<i32> {
+    if std::env::args_os().nth(1).is_some_and(|arg| arg == "mcp") {
+        return mcp::run();
+    }
     if std::env::args_os().nth(1).is_some_and(|arg| arg == "ctl") {
         return Ok(control::run_cli());
     }

@@ -4,6 +4,9 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inflateSync } from 'node:zlib';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { connect, ControlError } from '../js/client.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const executable = resolve(root, process.env.PEREGRUST_BINARY ?? `target/debug/peregrust${process.platform === 'win32' ? '.exe' : ''}`);
@@ -114,12 +117,56 @@ try {
   const timedOut = await ctl('input.key', { code: 'KeyD', key: 'd', frames: 600 }, ['--timeout-ms', '100'], 1);
   assert.equal(timedOut.error.code, 'TIMEOUT');
   assert.deepEqual((await ctl('state.get', { name: 'player' })).result.value.held, []);
+  const client = await connect(session);
+  const paused = await client.call('runtime.pause');
+  await pause(60);
+  const info = await client.call('runtime.info');
+  assert.equal(info.frame, paused.frame);
+  assert.equal(info.result.paused, true);
+  const batch = await client.batch([{ method: 'action.list' }, { method: 'state.list' }]);
+  assert.equal(batch[0].result.actions[0].name, 'player.teleport');
+  assert.equal(batch[1].frame, paused.frame);
+  await assert.rejects(client.call('action.call', { name: 'player.teleport', input: { x: 'bad', y: 0 } }),
+    error => error instanceof ControlError && error.code === 'INVALID_ARGUMENT');
+  const teleported = await client.call('action.call', { name: 'player.teleport', input: { x: 0.3, y: 0.2 }, observe: { state: 'player' } });
+  assert.deepEqual(teleported.result.state.position, [0.3, 0.2, 0]);
+  assert.equal(teleported.frame, paused.frame);
+  const stepped = await client.call('runtime.step', { frames: 4, dtMs: 20 });
+  assert.equal(stepped.frame, paused.frame + 4);
+  const steppedInfo = await client.call('runtime.info');
+  assert.ok(Math.abs(steppedInfo.result.animationTimeMs - info.result.animationTimeMs - 80) < 1e-6);
+  const logs = await client.call('runtime.logs', { level: 'info' });
+  assert.ok(logs.result.entries.some(entry => entry.message.includes('Player teleported')));
+  assert.ok((await client.call('runtime.metrics')).result.callbackMs.mean >= 0);
+  await client.capture({ width: 80, height: 60 }, resolve(artifacts, 'control-sdk.png'));
+  const mcp = new Client({ name: 'peregrust-integration-test', version: '1.0.0' });
+  const transport = new StdioClientTransport({ command: executable, args: ['mcp', '--session', session], stderr: 'pipe' });
+  try {
+    await mcp.connect(transport);
+    const tools = await mcp.listTools();
+    assert.ok(tools.tools.some(tool => tool.name === 'runtime_step'));
+    assert.ok(tools.tools.some(tool => tool.name === 'action_call'));
+    const state = await mcp.callTool({ name: 'state_get', arguments: { name: 'player' } });
+    assert.deepEqual(state.structuredContent.result.value.position, [0.3, 0.2, 0]);
+    const invalidAction = await mcp.callTool({ name: 'action_call', arguments: { name: 'player.teleport', input: { x: 'bad', y: 0 } } });
+    assert.equal(invalidAction.isError, true);
+    const image = await mcp.callTool({ name: 'frame_capture', arguments: { width: 80, height: 60 } });
+    const imageBlock = image.content.find(block => block.type === 'image');
+    assert.equal(imageBlock.mimeType, 'image/png');
+    assert.equal(image.structuredContent.result.capture.data, undefined);
+    const pngPath = resolve(artifacts, 'control-mcp.png');
+    writeFileSync(pngPath, Buffer.from(imageBlock.data, 'base64'));
+    assert.equal(decodePng(pngPath).width, 80);
+    const next = await mcp.callTool({ name: 'runtime_step', arguments: { frames: 2, dtMs: 10 } });
+    assert.equal(next.structuredContent.frame, stepped.frame + 2);
+  } finally { await mcp.close(); }
+  await client.call('runtime.resume');
   // Close through game input; a stopped response is allowed during shutdown.
   await ctl('input.dispatch', { event: { type: 'keydown', code: 'Escape', key: 'Escape' } }).catch(() => {});
   const code = await Promise.race([exited, pause(10000).then(() => { throw new Error('shutdown timed out'); })]);
   assert.equal(code, 0, log);
   assert.equal(existsSync(session), false, 'normal shutdown removes session credentials');
-  console.log('PASS persistent CLI session, scene queries/updates, exact input duration, observations, errors, timeout recovery, native PNG GPU pixels/orientation and cleanup');
+  console.log('PASS CLI, Node SDK, official MCP client interoperability, pause/step clock, actions, logs/metrics, scene queries/updates, input, PNG GPU pixels/orientation and cleanup');
   console.log(`Captures: ${firstCapture}, ${resolve(artifacts, 'control-after.png')}`);
 } finally {
   if (game.exitCode === null) { game.kill(); await exited; }

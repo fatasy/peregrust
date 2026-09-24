@@ -337,32 +337,45 @@ struct ControlCli {
     output: Option<PathBuf>,
 }
 
-fn call(cli: &ControlCli) -> Result<Value> {
-    let session: Session = serde_json::from_slice(&std::fs::read(&cli.session)?)?;
+pub(crate) fn request(
+    session_path: &Path,
+    method: &str,
+    params: Value,
+    timeout_ms: u64,
+) -> Result<Value> {
+    if !(1..=60000).contains(&timeout_ms) {
+        bail!("timeout must be between 1 and 60000 ms");
+    }
+    let session: Session = serde_json::from_slice(&std::fs::read(session_path)?)?;
     if session.version != 1 || !session.address.ip().is_loopback() {
         bail!("unsupported or nonlocal session");
     }
-    let params: Value = serde_json::from_str(&match &cli.params_file {
-        Some(path) => std::fs::read_to_string(path)?,
-        None => cli.params.clone(),
-    })?;
     if !params.is_object() {
         bail!("params must be a JSON object");
     }
-    let request = json!({"token": session.token, "method": cli.method, "params": params, "timeoutMs": cli.timeout_ms});
+    let request = json!({"token": session.token, "method": method, "params": params, "timeoutMs": timeout_ms});
     let bytes = serde_json::to_vec(&request)?;
     if bytes.len() as u64 >= MAX_REQUEST {
         bail!("request exceeds 1 MiB");
     }
     let mut stream = TcpStream::connect_timeout(&session.address, Duration::from_secs(2))?;
-    stream.set_read_timeout(Some(Duration::from_millis(cli.timeout_ms + 5000)))?;
+    stream.set_read_timeout(Some(Duration::from_millis(timeout_ms + 5000)))?;
     stream.set_write_timeout(Some(Duration::from_secs(2)))?;
     stream.write_all(&bytes)?;
     stream.write_all(b"\n")?;
-    let mut response = read_message(&stream, MAX_RESPONSE)?;
+    let response = read_message(&stream, MAX_RESPONSE)?;
     if response.get("sessionId").and_then(Value::as_str) != Some(&session.session_id) {
         bail!("response session mismatch");
     }
+    Ok(response)
+}
+
+fn call(cli: &ControlCli) -> Result<Value> {
+    let params: Value = serde_json::from_str(&match &cli.params_file {
+        Some(path) => std::fs::read_to_string(path)?,
+        None => cli.params.clone(),
+    })?;
+    let mut response = request(&cli.session, &cli.method, params, cli.timeout_ms)?;
     if response["ok"] == true
         && let Some(path) = &cli.output
     {

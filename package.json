@@ -15,6 +15,10 @@
     "./inspect/three": {
       "types": "./types/inspect_three.d.ts",
       "default": "./js/inspect_three.js"
+    },
+    "./client": {
+      "types": "./types/client.d.ts",
+      "default": "./js/client.js"
     }
   },
   "types": "./types/index.d.ts",
@@ -35,6 +39,7 @@
     "three": "0.186.0"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "1.30.1",
     "esbuild": "0.28.2",
     "typescript": "7.0.2"
   }

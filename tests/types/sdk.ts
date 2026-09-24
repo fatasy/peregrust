@@ -2,12 +2,22 @@ import { Peregrust, canvas, window } from 'peregrust';
 import { loadGLTF } from 'peregrust/three';
 import { attachThree } from 'peregrust/inspect/three';
 import type { Object3D, Camera, WebGPURenderer } from 'three/webgpu';
+import { connect } from 'peregrust/client';
 
 Peregrust.control.registerState('test', () => ({ health: 100, position: [0, 1, 2] }));
 function registerInspector(scene: Object3D, camera: Camera, renderer: WebGPURenderer) {
   return attachThree({ scene, camera, renderer });
 }
 void registerInspector;
+Peregrust.control.registerAction('heal', {
+  description: 'Heal player', inputSchema: { type: 'object', properties: { amount: { type: 'number' } } },
+}, ({ amount }) => ({ amount }));
+async function controlExample(session: string) {
+  const client = await connect(session);
+  const info = await client.call<{ paused: boolean }>('runtime.info');
+  return info.result.paused;
+}
+void controlExample;
 
 const context: GPUCanvasContext = canvas.getContext('webgpu');
 const dimensions: [number, number] = [window.innerWidth, window.innerHeight];
