@@ -79,7 +79,20 @@ export function attachThree({ scene, camera, renderer, name = 'main', runtime = 
     try {
       renderer.setRenderTarget(target);
       renderer.render(scene, camera);
-      const pixels = await renderer.readRenderTargetPixelsAsync(target, 0, 0, width, height);
+      const readback = await renderer.readRenderTargetPixelsAsync(target, 0, 0, width, height);
+      const rowBytes = width * 4;
+      let pixels = readback;
+      // Three's WebGPU backend returns the copy buffer with 256-byte row
+      // alignment (and no padding after its final row). PNG needs packed RGBA.
+      if (readback.byteLength !== rowBytes * height) {
+        const stride = Math.ceil(rowBytes / 256) * 256;
+        if (readback.byteLength !== stride * (height - 1) + rowBytes && readback.byteLength !== stride * height) {
+          throw new Error('unexpected RGBA8 capture buffer size');
+        }
+        const bytes = new Uint8Array(readback.buffer, readback.byteOffset, readback.byteLength);
+        pixels = new Uint8Array(rowBytes * height);
+        for (let y = 0; y < height; y++) pixels.set(bytes.subarray(y * stride, y * stride + rowBytes), y * rowBytes);
+      }
       return { width, height, pixels };
     } finally {
       renderer.setRenderTarget(previous, previousFace, previousLevel);
