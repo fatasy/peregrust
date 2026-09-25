@@ -130,8 +130,45 @@ export interface PeregrustGpu {
   getUploadStatistics(): PeregrustUploadStatistics;
 }
 
+/** Native retained renderer. Handles are scoped to a renderer and never reused. */
+export interface PeregrustKestrel {
+  readonly abiVersion: 8;
+  /** settings: [sampleCount (1 or 4), hdr (0 or 1)]. MSAA 4 requires HDR. */
+  createRenderer(device: GPUDevice, format: 'bgra8unorm' | 'bgra8unorm-srgb' | 'rgba8unorm' | 'rgba8unorm-srgb', settings: Uint32Array): number;
+  /** Vertex stride: position3, normal3, uv2, color4; bounds: min3, max3. */
+  createGeometry(renderer: number, vertices: Float32Array, indices: Uint32Array, bounds: Float32Array): number;
+  /** Program-defined vertex layout; position.xyz must occupy the first three floats. */
+  createShaderGeometry(renderer: number, program: number, vertices: Float32Array, indices: Uint32Array, bounds: Float32Array): number;
+  /** descriptor: sourceKind,width,height,colorSpace,flipY,mips,wrapU,wrapV,mag,min,mipFilter,anisotropy.
+   * info receives decoded width,height,mip count. Kinds: 0 RGBA8 color, 1 R32F, 2 encoded image,
+   * 3 raw RGBA8 independent fields. Kind 3 filters all four mip channels independently and requires linear colorSpace. */
+  createTexture(renderer: number, descriptor: Uint32Array, data: Uint8Array, info: Uint32Array): number;
+  /** descriptor: format (0 BC1-sRGB, 1 BC4, 2 BC5), size, layers, supplied mip count, anisotropy.
+   * Payload is mip-major then layer-major, exactly block-compressed bytes. info receives size,size,mips. */
+  createCompressedTextureArray(renderer: number, descriptor: Uint32Array, data: Uint8Array, info: Uint32Array): number;
+  /** params: r,g,b,opacity,alphaTest,roughness,metalness,model,side,alphaToCoverage,0,0. textures[0]=colorMap or 0. */
+  createMaterial(renderer: number, params: Float32Array, textures: Uint32Array): number;
+  /** Registers WGSL and an explicit pipeline/resource descriptor once. */
+  createShaderProgram(renderer: number, descriptorJson: string, vertexWgsl: string, fragmentWgsl: string): number;
+  /** Parameters concatenate descriptor uniforms in their declared order. */
+  createShaderMaterial(renderer: number, program: number, params: Float32Array, textures: Uint32Array): number;
+  /** N matrices of 16 floats and N instance colors of 4 floats. */
+  createMesh(renderer: number, geometry: number, material: number, matrices: Float32Array, colors: Float32Array): number;
+  /** Frame (116 floats): viewProjection16, cameraPosition4, lightDirection4, lightColor4, ambient4,
+   * hemisphereSky4, hemisphereGround4, backgroundLinearRGBA4,
+   * exposure, toneMapping (0 none/1 ACES), outputColorSpace (0 linear/1 sRGB), reserved0,
+   * inverseProjection16, cameraWorld16, timeSeconds, near, far, reserved0,
+   * projectionMatrix16 and matrixWorldInverse16.
+   * Dirty pairs: [meshId, instanceId] per corresponding 16-float matrix.
+   * Stats written: [draw calls, visible instances, culled instances, GPU buffer writes]. */
+  render(renderer: number, target: GPUTexture, frame: Float32Array, dirtyPairs: Uint32Array, dirtyMatrices: Float32Array, stats: Uint32Array): void;
+  /** kind: 0 renderer (id=0), 1 geometry, 2 material, 3 mesh, 4 texture, 5 shader program. */
+  destroy(renderer: number, kind: 0 | 1 | 2 | 3 | 4 | 5, id: number): void;
+}
+
 export interface PeregrustRuntime {
   readonly gpu: PeregrustGpu;
+  readonly kestrel: PeregrustKestrel;
   readonly control: PeregrustControl;
   readonly canvas: PeregrustCanvas;
   readonly window: PeregrustWindow;

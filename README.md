@@ -71,6 +71,8 @@ Para extensões Rust incorporadas ao jogo, veja [armazenamento nativo e transfer
 
 Para experimentar uploads WebGPU em lotes no mesmo device, consulte [writeBufferBatch e medição de uploads](docs/gpu-uploads.md). O agrupamento automático é opcional e permanece desligado por padrão.
 
+O renderer Kestrel possui [núcleo Rust incorporado](docs/kestrel.md), com recursos persistentes, culling por instância e submissão de draws nativa. Sua API TypeScript própria é desenvolvida para o Wuxia.
+
 ## Controle por IA
 
 Inicie um jogo com `--control artifacts/game-session.json` para habilitar uma
