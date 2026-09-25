@@ -44,6 +44,8 @@ if (build.code !== 0 || build.timedOut) {
 }
 
 const cases = [
+  { name: 'native upload batches, source snapshots, readback and validation scopes', entry: 'tests/integration/fixtures/gpu-upload-batch.js', marker: 'GPU_UPLOAD_BATCH_OK', success: true, frames: null },
+  { name: 'creation-mapped buffers start zeroed and write back', entry: 'tests/integration/fixtures/gpu-mapped-at-creation.js', marker: 'GPU_MAPPED_AT_CREATION_OK', success: true, frames: null },
   { name: 'shutdown with an acquired unpresented GPU frame', entry: 'tests/integration/fixtures/exit-acquired-frame.ts', marker: 'EXIT_ACQUIRED_FRAME_OK', success: true, frames: null },
   { name: 'TypeScript imports and top-level await', entry: 'tests/integration/fixtures/tla-import.ts', marker: 'TLA_IMPORT_OK', success: true, frames: 3 },
   { name: 'timer wake without animation frames', entry: 'tests/integration/fixtures/timer-wake.ts', marker: 'TIMER_WAKE_OK', success: true, frames: null },

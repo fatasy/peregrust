@@ -69,6 +69,8 @@ Veja [o exemplo Three.js](examples/three-demo.js), [as declarações do SDK](typ
 
 Para extensões Rust incorporadas ao jogo, veja [armazenamento nativo e transferência de buffers](docs/native-storage.md).
 
+Para experimentar uploads WebGPU em lotes no mesmo device, consulte [writeBufferBatch e medição de uploads](docs/gpu-uploads.md). O agrupamento automático é opcional e permanece desligado por padrão.
+
 ## Controle por IA
 
 Inicie um jogo com `--control artifacts/game-session.json` para habilitar uma

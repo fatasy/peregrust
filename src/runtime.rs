@@ -207,6 +207,8 @@ impl Runtime {
                 Default::default(),
             ),
             deno_webgpu::deno_webgpu::init(),
+            crate::gpu_upload::peregrust_gpu_upload::init(),
+            crate::gpu_mapping::peregrust_gpu_mapping::init(),
             deno_image::deno_image::init(),
             crate::host::peregrust_host::init(),
             crate::web_assets::peregrust_web_assets::init(),
@@ -251,6 +253,10 @@ impl Runtime {
             .context("initializing persistent game storage")?;
         js.execute_script("peregrust:web-assets", include_str!("../js/web_assets.js"))
             .context("initializing asset loading and image textures")?;
+        js.execute_script("peregrust:gpu-uploads", include_str!("../js/gpu_upload.js"))
+            .context("initializing batched GPU uploads")?;
+        js.execute_script("peregrust:gpu-mapping", include_str!("../js/gpu_mapping.js"))
+            .context("initializing creation-mapped GPU buffers")?;
         let dispatch_event_fn = Self::lookup_function(&mut js, "__peregrustDispatchEvent")?;
         let dispatch_frame_fn = Self::lookup_function(&mut js, "__peregrustDispatchFrame")?;
         Ok(Self {

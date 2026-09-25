@@ -2,6 +2,8 @@ mod audio;
 mod control;
 mod gamepad;
 mod gpu;
+mod gpu_mapping;
+mod gpu_upload;
 mod host;
 mod loader;
 mod mcp;

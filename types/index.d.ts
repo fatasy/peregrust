@@ -106,7 +106,32 @@ export interface PeregrustGamepads {
   poll(): Array<PeregrustGamepad | null>;
 }
 
+/** Flat groups of [buffer, bufferOffset, source, dataOffset, size]. */
+export type PeregrustUploadBatch = ReadonlyArray<GPUBuffer | number | ArrayBuffer | ArrayBufferView | undefined>;
+
+export interface PeregrustUploadStatistics {
+  enabled: boolean;
+  batchingQueues: number;
+  adapterInfo: { vendor: string; architecture: string; device: string; description: string } | null;
+  uploadCalls: number;
+  /** Requested source payload bytes, not GPU memory allocated. */
+  uploadBytes: number;
+  nativeWriteCalls: number;
+  nativeBatchCalls: number;
+  nativeCalls: number;
+  batchedUploads: number;
+  batchBytes: number;
+  submissions: number;
+}
+
+export interface PeregrustGpu {
+  /** Flushes pending writes, switches statistics and resets cumulative counters. */
+  setUploadStatisticsEnabled(enabled: boolean): void;
+  getUploadStatistics(): PeregrustUploadStatistics;
+}
+
 export interface PeregrustRuntime {
+  readonly gpu: PeregrustGpu;
   readonly control: PeregrustControl;
   readonly canvas: PeregrustCanvas;
   readonly window: PeregrustWindow;
@@ -136,5 +161,14 @@ export const canvas: PeregrustCanvas;
 export const window: PeregrustWindow;
 
 declare global {
+  interface GPUQueue {
+    /** Synchronous native batch. Offsets/sizes are elements for TypedArrays, bytes otherwise.
+     * Sources must be non-shared; numeric offsets/sizes must be nonnegative safe integers.
+     * Earlier writes remain applied if a later operation throws. GPU validation uses error scopes. */
+    writeBufferBatch(operations: PeregrustUploadBatch): void;
+    /** Opt-in coalescing of writeBuffer calls, with source snapshots and ordered flushes. */
+    setWriteBufferBatching(enabled: boolean): boolean;
+    flushWriteBufferBatch(): void;
+  }
   const Peregrust: PeregrustRuntime;
 }
