@@ -196,15 +196,20 @@ o estado antes de repetir uma ação. Operações são serializadas por sessão.
 ## Captura e tempo
 
 O adaptador renderiza a cena/câmera registrada em um render target temporário e
-lê os pixels reais da GPU. O PNG tem no máximo 2048×2048; sem dimensões explícitas,
+lê os pixels reais da GPU. Esse target é o *output render target* do renderer: a
+saída de tela (render target `null`) vai para ele com o mesmo tone mapping e a
+mesma codificação sRGB do canvas, então o PNG tem os bytes que a janela mostra.
+O PNG tem no máximo 2048×2048; sem dimensões explícitas,
 preserva a proporção do drawing buffer e reduz a resolução se necessário.
 `--output` grava o PNG no lado do cliente e substitui o base64 por `path` no JSON.
 Sem essa opção, a resposta contém `mimeType`, `width`, `height` e `data` base64.
 
 Por padrão, a captura não inclui decoração da janela, composição de múltiplas
 câmeras ou pipelines personalizados. Para incluir o pipeline do jogo, passe
-`render: () => engine.renderView()` a `attachThree`: o callback deve renderizar
-no target atual sem avançar a simulação nem esperar outro RAF. Há uma
+`render: () => engine.renderView()` a `attachThree`: o callback deve desenhar o
+quadro como faria na tela (render target `null`, redirecionado para a captura),
+sem avançar a simulação nem esperar outro RAF. Pipelines que codificam a própria
+saída, como `RenderPipeline`, saem idênticos à janela. Há uma
 renderização extra, que também executa hooks de renderização do Three.js.
 O render target anterior é restaurado mesmo se a leitura falhar. Dimensões
 personalizadas não alteram a projeção da câmera.

@@ -1,4 +1,5 @@
 import * as THREE from 'three/webgpu';
+import { pass } from 'three/tsl';
 import { attachThree } from 'peregrust/inspect/three';
 
 const renderer = new THREE.WebGPURenderer({ canvas: Peregrust.canvas, alpha: false, antialias: false });
@@ -20,7 +21,17 @@ const marker = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.4),
 marker.name = 'orientation-marker';
 marker.position.set(-1.4, 1, 0);
 scene.add(marker);
+// Mid grey: 0x808080 is 128 on screen, so captures show whether colour is encoded once.
+const swatch = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.4),
+  new THREE.MeshBasicMaterial({ color: 0x808080, toneMapped: false }));
+swatch.name = 'grey-swatch';
+swatch.position.set(1.4, -1, 0);
+scene.add(swatch);
 attachThree({ scene, camera, renderer });
+// The same view through a RenderPipeline, whose output pass tone maps and encodes itself.
+const pipeline = new THREE.RenderPipeline(renderer);
+pipeline.outputNode = pass(scene, camera);
+attachThree({ name: 'pipeline', scene, camera, renderer, render: () => pipeline.render() });
 const held = new Set();
 let pointerEvents = 0;
 window.addEventListener('keydown', (event) => {

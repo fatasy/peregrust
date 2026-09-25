@@ -1,4 +1,4 @@
-import { RenderTarget, Vector2, Vector3, SRGBColorSpace, UnsignedByteType } from 'three/webgpu';
+import { NoColorSpace, RenderTarget, Vector2, Vector3, SRGBColorSpace, UnsignedByteType } from 'three/webgpu';
 
 const fields = ['id', 'name', 'type', 'parent', 'position', 'rotation', 'scale', 'visible', 'worldPosition', 'tags'];
 const invalid = (message) => Object.assign(new Error(message), { code: 'INVALID_ARGUMENT' });
@@ -72,12 +72,24 @@ export function attachThree({ scene, camera, renderer, render, name = 'main', ru
     const width = params.width ?? Math.max(1, Math.round(size.x * factor));
     const height = params.height ?? Math.max(1, Math.round(size.y * factor));
     if (![width, height].every((value) => Number.isInteger(value) && value >= 1 && value <= 2048)) throw invalid('capture dimensions must be integers between 1 and 2048');
-    const target = new RenderTarget(width, height, { type: UnsignedByteType, colorSpace: SRGBColorSpace });
+    // The capture stands in for the canvas: Three draws screen output (render
+    // target null) into an output render target with the canvas's tone mapping
+    // and colour-space encode. Like the canvas it is plain rgba8unorm; an sRGB
+    // format encoded pipeline output (RenderPipeline, PostProcessing) twice.
+    const outputs = typeof renderer.setOutputRenderTarget === 'function';
+    const target = new RenderTarget(width, height, { type: UnsignedByteType,
+      colorSpace: outputs ? NoColorSpace : SRGBColorSpace });
     const previous = renderer.getRenderTarget();
     const previousFace = renderer.getActiveCubeFace();
     const previousLevel = renderer.getActiveMipmapLevel();
+    const previousOutput = outputs ? renderer.getOutputRenderTarget() : null;
     try {
-      renderer.setRenderTarget(target);
+      if (outputs) {
+        renderer.setOutputRenderTarget(target);
+        renderer.setRenderTarget(null);
+      } else {
+        renderer.setRenderTarget(target);
+      }
       if (render) await render();
       else renderer.render(scene, camera);
       const readback = await renderer.readRenderTargetPixelsAsync(target, 0, 0, width, height);
@@ -96,6 +108,7 @@ export function attachThree({ scene, camera, renderer, render, name = 'main', ru
       }
       return { width, height, pixels };
     } finally {
+      if (outputs) renderer.setOutputRenderTarget(previousOutput);
       renderer.setRenderTarget(previous, previousFace, previousLevel);
       target.dispose();
     }

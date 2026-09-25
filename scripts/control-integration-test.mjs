@@ -95,6 +95,17 @@ try {
   assert.ok(before.pixel(10, 10)[2] > 200, 'background must be blue');
   assert.ok(before.pixel(48, 40)[1] > 200, `top-left marker must be green: ${before.pixel(48, 40)}`);
   assert.ok(before.pixel(48, 200)[2] > 200, 'bottom-left must remain blue (no vertical flip)');
+  // Captures carry the screen's bytes: mid grey reads 128, direct or through a pipeline.
+  const grey = (image, label) => {
+    const value = image.pixel(272, 200);
+    assert.ok(value.slice(0, 3).every(channel => Math.abs(channel - 128) <= 3), `${label} grey swatch must read 128: ${value}`);
+  };
+  grey(before, 'direct capture');
+  const piped = resolve(artifacts, 'control-pipeline.png');
+  await ctl('frame.capture', { scene: 'pipeline', width: 320, height: 240 }, ['--output', piped]);
+  const pipelineCapture = decodePng(piped);
+  grey(pipelineCapture, 'pipeline capture');
+  assert.ok(pipelineCapture.pixel(160, 120)[0] > 200 && pipelineCapture.pixel(10, 10)[2] > 200, 'pipeline capture keeps the scene');
   const updated = await ctl('scene.update', { id, position: [0.5, 0, 0] });
   assert.equal(updated.result.objects[0].position[0], 0.5);
   const observed = await ctl('input.key', { code: 'KeyW', key: 'w', frames: 10,
