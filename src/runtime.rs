@@ -266,8 +266,11 @@ impl Runtime {
             .context("initializing asset loading and image textures")?;
         js.execute_script("peregrust:gpu-uploads", include_str!("../js/gpu_upload.js"))
             .context("initializing batched GPU uploads")?;
-        js.execute_script("peregrust:gpu-mapping", include_str!("../js/gpu_mapping.js"))
-            .context("initializing creation-mapped GPU buffers")?;
+        js.execute_script(
+            "peregrust:gpu-mapping",
+            include_str!("../js/gpu_mapping.js"),
+        )
+        .context("initializing creation-mapped GPU buffers")?;
         let dispatch_event_fn = Self::lookup_function(&mut js, "__peregrustDispatchEvent")?;
         let dispatch_frame_fn = Self::lookup_function(&mut js, "__peregrustDispatchFrame")?;
         Ok(Self {
