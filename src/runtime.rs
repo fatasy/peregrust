@@ -187,6 +187,17 @@ impl Runtime {
         {
             bail!("V8 heap limit must be at least 16 MiB");
         }
+        // Diagnostics and GC tuning, e.g. PEREGRUST_V8_FLAGS="--trace-gc". V8
+        // reads flags once, before the first isolate of the process.
+        if let Ok(flags) = std::env::var("PEREGRUST_V8_FLAGS") {
+            let args = std::iter::once(String::new())
+                .chain(flags.split_whitespace().map(str::to_owned))
+                .collect();
+            let unknown = deno_core::v8_set_flags(args);
+            if unknown.len() > 1 {
+                eprintln!("Peregrust: unrecognized V8 flags: {:?}", &unknown[1..]);
+            }
+        }
         let mut loader = ProjectModuleLoader::new(&config.project_root)
             .map_err(|error| anyhow!(error.to_string()))?;
         if let Some(path) = &config.import_map {
